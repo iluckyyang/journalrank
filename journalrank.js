@@ -99,6 +99,278 @@
 // @exclude      *://localhost:8787/*
 // @exclude      *://127.0.0.1:8787/*
 // @connect      *
+// @connect      cnki.net
+// @connect      deepl.com
+// @connect      deepl-pro.com
+// @connect      baidu.com
+// @connect      iciba.com
+// @connect      naver.com
+// @connect      xfyun.cn
+// @connect      xf-yun.com
+// @connect      openl.club
+// @connect      yandex.net
+// @connect      yandex.com
+// @connect      youdao.com
+// @connect      taobao.com
+// @connect      alibaba.com
+// @connect      reverso.net
+// @connect      niutrans.com
+// @connect      caiyunai.com
+// @connect      volcengine.com
+// @connect      volcengineapi.com
+// @connect      myhuaweicloud.com
+// @connect      tencentcloudapi.com
+// @connect      microsofttranslator.com
+// @connect      libretranslate.com
+// @connect      papago-chrome.com
+// @connect      githubusercontent.com
+// @connect      ctcontents.com
+// @connect      ctfile.com
+// @connect      jihulab.com
+// @connect      gitlab.com
+// @connect      gitlab.cn
+// @connect      gitea.com
+// @connect      gitee.com
+// @connect      github.com
+// @connect      gitcode.com
+// @connect      scigreat.com
+// @connect      sssam.com
+// @connect      ooopn.com
+// @connect      llhlf.com
+// @connect      libgen.bz
+// @connect      libgen.la
+// @connect      libgen.li
+// @connect      libgen.bz
+// @connect      libgen.vg
+// @connect      libgen.ee
+// @connect      libgen.gs
+// @connect      libgen.gl
+// @connect      booksdl.org
+// @connect      crossref.org
+// @connect      crosscite.org
+// @connect      fenqubiao.com
+// @connect      arxiv.org
+// @connect      doi.org
+// @connect      oa.works
+// @connect      ieee.org
+// @connect      oadoi.org
+// @connect      core.ac.uk
+// @connect      scopus.com
+// @connect      pubpeer.com
+// @connect      openalex.org
+// @connect      elsevier.com
+// @connect      unpaywall.org
+// @connect      researchgate.net
+// @connect      sciencedirect.com
+// @connect      connectedpapers.com
+// @connect      semanticscholar.org
+// @connect      openaccessbutton.org
+// @connect      ncbi.nlm.nih.gov
+// @connect      zidianzhan.net
+// @connect      usualwant.com
+// @connect      scrongyao.com
+// @connect      bothonce.com
+// @connect      3800808.com
+// @connect      et-fine.com
+// @connect      wellesu.com
+// @connect      hkvisa.net
+// @connect      tesble.com
+// @connect      pismin.com
+// @connect      sci-hub.ren
+// @connect      sci-hub.cat
+// @connect      sci-hub.box
+// @connect      sci-hub.red
+// @connect      sci-hub.ee
+// @connect      sci-hub.se
+// @connect      sci-hub.st
+// @connect      sci-hub.ru
+// @connect      sci-hub.wf
+// @connect      sci-hub.yt
+// @connect      sci-hub.in
+// @connect      sci-hub.lu
+// @connect      sci-hub.vg
+// @connect      sci-hub.al
+// @connect      vkif.top
+// @connect      bban.top
+// @connect      mksa.top
+// @connect      google.ae
+// @connect      google.at
+// @connect      google.be
+// @connect      google.bg
+// @connect      google.ca
+// @connect      google.cat
+// @connect      google.ch
+// @connect      google.cl
+// @connect      google.co.cr
+// @connect      google.co.id
+// @connect      google.co.il
+// @connect      google.co.in
+// @connect      google.co.jp
+// @connect      google.co.kr
+// @connect      google.co.nz
+// @connect      google.co.th
+// @connect      google.co.uk
+// @connect      google.co.ve
+// @connect      google.co.za
+// @connect      google.com.ar
+// @connect      google.com.au
+// @connect      google.com.bo
+// @connect      google.com.br
+// @connect      google.com.co
+// @connect      google.com.cu
+// @connect      google.com.do
+// @connect      google.com.ec
+// @connect      google.com.eg
+// @connect      google.com.gt
+// @connect      google.com.hk
+// @connect      google.com.ly
+// @connect      google.com.mx
+// @connect      google.com.my
+// @connect      google.com.ni
+// @connect      google.com.pa
+// @connect      google.com.pe
+// @connect      google.com.ph
+// @connect      google.com.pk
+// @connect      google.com.pr
+// @connect      google.com.py
+// @connect      google.com.sg
+// @connect      google.com.sv
+// @connect      google.com.tr
+// @connect      google.com.tw
+// @connect      google.com.ua
+// @connect      google.com.uy
+// @connect      google.com.vn
+// @connect      google.com
+// @connect      google.cz
+// @connect      google.de
+// @connect      google.dk
+// @connect      google.es
+// @connect      google.fi
+// @connect      google.fr
+// @connect      google.gr
+// @connect      google.hk
+// @connect      google.hn
+// @connect      google.hr
+// @connect      google.hu
+// @connect      google.is
+// @connect      google.it
+// @connect      google.jp
+// @connect      google.li
+// @connect      google.lt
+// @connect      google.lu
+// @connect      google.lv
+// @connect      google.nl
+// @connect      google.no
+// @connect      google.pk
+// @connect      google.pl
+// @connect      google.pt
+// @connect      google.ro
+// @connect      google.ru
+// @connect      google.se
+// @connect      google.si
+// @connect      google.sk
+// @connect      typicalgame.com
+// @connect      defineabc.com
+// @connect      dotaindex.com
+// @connect      panda985.com
+// @connect      lanfanshu.cn
+// @connect      cljtscd.com
+// @connect      aigrogu.com
+// @connect      linfen3.top
+// @connect      gupiaoq.com
+// @connect      fropet.com
+// @connect      beds.ac.uk
+// @connect      kcpon.com
+// @connect      nq69.top
+// @connect      vygc.top
+// @connect      add.pub
+// @connect      iit.xyz
+// @connect      nbguge.com
+// @connect      essclick.com
+// @connect      duavekuran.com
+// @connect      sci-hub.org.cn
+// @connect      plausibility.cloud
+// @connect      thedaviddelta.com
+// @connect      sphererapids.com
+// @connect      dialectapp.org
+// @connect      paperguard.cc
+// @connect      pot-app.com
+// @connect      vercel.app
+// @connect      lingva.ml
+// @connect      gpt.ge
+// @connect      bltcy.ai
+// @connect      gptbest.vip
+// @connect      aaai.vip
+// @connect      vveai.com
+// @connect      api.v3.cm
+// @connect      api.v36.cm
+// @connect      sealos.run
+// @connect      api2d.net
+// @connect      api2d.site
+// @connect      api2d.online
+// @connect      tryfastgpt.ai
+// @connect      apiproxy.top
+// @connect      oaibest.com
+// @connect      g4f.icu
+// @connect      fastgpt.cn
+// @connect      aiproxy.io
+// @connect      dmxapi.com
+// @connect      deerapi.com
+// @connect      gptsapi.net
+// @connect      chatfire.cn
+// @connect      chatfire.cc
+// @connect      apiproxy.top
+// @connect      aihubmix.com
+// @connect      zhidouai.com
+// @connect      openkey.cloud
+// @connect      openai-sb.com
+// @connect      fast-tunnel.one
+// @connect      blueshirtmap.com
+// @connect      openai-proxy.live
+// @connect      closeai-proxy.xyz
+// @connect      openai-proxy.org
+// @connect      chatanywhere.org
+// @connect      chatanywhere.tech
+// @connect      api-forwards.com
+// @connect      openai.com
+// @connect      x.ai
+// @connect      360.cn
+// @connect      jina.ai
+// @connect      groq.com
+// @connect      mistral.ai
+// @connect      cohere.ai
+// @connect      cohere.com
+// @connect      moonshot.cn
+// @connect      deepseek.com
+// @connect      minimaxi.com
+// @connect      sensenova.cn
+// @connect      fireworks.ai
+// @connect      together.xyz
+// @connect      anthropic.com
+// @connect      modelscope.cn
+// @connect      openrouter.ai
+// @connect      perplexity.ai
+// @connect      googleapis.com
+// @connect      siliconflow.cn
+// @connect      siliconflow.com
+// @connect      hyperbolic.xyz
+// @connect      api.nvidia.com
+// @connect      cloudflare.com
+// @connect      lingyiwanwu.com
+// @connect      baichuan-ai.com
+// @connect      llama-api.com
+// @connect      llmapi.com
+// @connect      infini-ai.com
+// @connect      aliyuncs.com
+// @connect      baidubce.com
+// @connect      tencent.com
+// @connect      ppinfra.com
+// @connect      bigmodel.cn
+// @connect      stepfun.com
+// @connect      volces.com
+// @connect      wair.ac.cn
+// @connect      localhost
+// @connect      127.0.0.1
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
 // @grant        GM_setValue
@@ -163,8 +435,8 @@
     displayOrder: ['imf', 'jcr', 'cas', 'xr', 'ei', 'cscd', 'cssci', 'xr_warning'],
     // Local JSON mode: set localJsonUrl to a flat JSON URL for instant lookups
     // Generate via: python scripts/export_flat_json.py --minify --gzip
-    localJsonUrl: '',      // e.g. 'http://127.0.0.1:8787/data/journals_flat.json.gz'
-    useLocal: false,       // automatically set after first successful load
+    localJsonUrl: 'http://127.0.0.1:8787/data/journals_flat.json.gz',      // e.g. 'http://127.0.0.1:8787/data/journals_flat.json.gz'
+    useLocal: true,        // 默认开启本地优先：加载成功则离线秒查，失败自动回退服务器模式
   };
 
   // Load settings
@@ -211,6 +483,10 @@
         if (url.endsWith('.gz')) {
           // GM_xmlhttpRequest doesn't natively decompress gzip for arraybuffer
           // in all browsers.  We fetch as blob and use DecompressionStream.
+          // Guard: Firefox/Safari 旧版本不支持 DecompressionStream → 给出明确提示
+          if (typeof DecompressionStream === 'undefined') {
+            throw new Error('当前浏览器不支持 DecompressionStream，请改用 .json 地址或现代 Chrome/Edge');
+          }
           const resp = await new Promise((resolve, reject) => {
             GM_xmlhttp({
               url, method: 'GET', responseType: 'blob', timeout: 30000,
@@ -296,13 +572,20 @@
         return this._toResult(this._byTitle.get(nt));
       }
 
-      // 3. Fuzzy: prefix match
+      // 3. Fuzzy: 查询串包含或起始于某个候选键（取最具体的候选）
+      //    原实现 key.includes(nt) 方向反了，导致 "The Lancet" 匹配不到 "LANCET"；
+      //    且无排序，短查询可能误配到子刊。现改为 nt.startsWith(key)||nt.includes(key)，
+      //    并选取长度最长的候选（最接近完整期刊名）。
       if (nt && nt.length >= 4) {
+        let best = null;
+        let bestLen = -1;
         for (const [key, rec] of this._byTitle) {
-          if (key.startsWith(nt) || key.includes(nt)) {
-            return this._toResult(rec);
+          if (key.length >= 4 && key.length <= nt.length &&
+              (nt.startsWith(key) || nt.includes(key))) {
+            if (key.length > bestLen) { best = rec; bestLen = key.length; }
           }
         }
+        if (best) return this._toResult(best);
       }
 
       return null;
@@ -1728,6 +2011,11 @@
 
       // --- Resolve journals: local JSON first, then server fallback ---
       const groupList = Array.from(groups.values());
+      // Build the server payload ONCE (fixes ReferenceError on queryPayload)
+      const payload = groupList.map(g => {
+        const rep = g.detections[0];
+        return { title: rep.title || '', issn: rep.issn || '', eissn: rep.eissn || '' };
+      });
       let results;
       let useMode = 'server';
 
@@ -1745,11 +2033,7 @@
         for (let i = 0; i < results.length; i++) {
           if (!results[i]) {
             notFoundIdx.push(i);
-            notFound.push({
-              title: groupList[i].detections[0].title || '',
-              issn: groupList[i].detections[0].issn || '',
-              eissn: groupList[i].detections[0].eissn || '',
-            });
+            notFound.push(payload[i]);
           }
         }
         if (notFound.length > 0) {
@@ -1763,7 +2047,7 @@
         }
       } else {
         // Server-only mode
-        results = await resolveAndRank(queryPayload);
+        results = await resolveAndRank(payload);
       }
 
       let rendered = 0;
