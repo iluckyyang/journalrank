@@ -895,7 +895,15 @@
     const t = (document.title || '').trim();
     if (!t || t.length < 5) return '';
     // Split on common separators and check each part
-    const parts = t.split(/\s[-–|·]\s/);
+    let parts = t.split(/\s[-–|·]\s/);
+    // CNKI 等中文站点用 "文章标题_期刊名"（下划线无空格分隔）→ 按最后一个 _ 切分。
+    // 仅对含中文字符的标题启用，避免误切英文标题中的单词下划线。
+    if (parts.length < 2 && /[\u4e00-\u9fff]/.test(t) && t.includes('_')) {
+      const idx = t.lastIndexOf('_');
+      if (idx > 0 && idx < t.length - 1) {
+        parts = [t.slice(0, idx), t.slice(idx + 1)];
+      }
+    }
     if (parts.length < 2) return '';
     // The journal name is usually the shorter part (article titles are longer)
     // and doesn't contain digits-heavy strings (years, volume numbers)
@@ -1094,20 +1102,33 @@
     ]},
 
     // --- CNKI (知网) — 搜索结果页 + 期刊详情页 + 文章详情页 ---
+    // 选择器依据 cnki-Scholar 插件（真机验证过新版/旧版/国际版 DOM）扩充：
+    //   来源单元格: td.source / td.publishing / td[data-key="source"]
+    //   详情页来源: .top-tip span a（不限 navi href）/ .wx-tit（新版头部宿主）
     { host: /cnki\.net$|cnki\.net\/|chkd\.cnki\.net$/, selectors: [
-      // 搜索结果页 — 旧版：来源列期刊名链接
+      // 搜索结果页 — 旧版：来源列期刊名链接（navi 期刊导航）
       { css: '.result-table-list tbody tr td.source a' },
       { css: 'td.source a[href*="navi.cnki.net"]' },
-      // 搜索结果页 — 新版2024+：来源期刊名
+      // 搜索结果页 — 来源单元格链接（不限 href，兼容新版/国际版）
+      { css: 'td.source a' },
+      { css: 'td.publishing a' },
+      { css: 'td[data-key="source"] a' },
+      // 搜索结果页 — 来源单元格无链接时取 span（插件: a,span 提取）
+      { css: 'td.source span, td.publishing span, td[data-key="source"] span' },
+      { css: '.s-main td.source a, .s-main td.source span' },
+      // 搜索结果页 — 新版2024+（列表容器变化）
       { css: '.result-table-list .source a' },
       { css: '.result-item .source-info a' },
       { css: '.search-detail .source a' },
-      // 文章详情页 — 期刊名
+      // 文章详情页 — 来源栏期刊名（cnki-Scholar 选择器，放宽 navi href 限制）
+      // 注: .wx-tit 是文章标题容器（插件仅用作标签插入宿主），不能作为期刊名来源
+      { css: '.top-tip span a' },
       { css: '.top-tip a[href*="navi.cnki"]' },
+      // 文章详情页 — 其他来源样式
       { css: '.top-tool .btn.read a' },
       { css: '.sourinfo .source a' },
       { css: 'a.journal' },
-      // 期刊详情页
+      // 期刊导航页 (navi.cnki.net) — 期刊名标题
       { css: 'h1.journaltitle' },
       { css: '#kcms-institution-info > h1#showname' },
       { css: '.cnki-compont > h1.journaltitle' },
