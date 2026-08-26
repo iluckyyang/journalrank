@@ -1,14 +1,13 @@
 // ==UserScript==
 // @name         JournalRank
 // @namespace    https://www.hezibuluo.com/JournalRank-local
-// @version      2.0.1
+// @version      2.2.0
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
 // @icon         data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="%233498db"/><text x="12" y="17" font-size="14" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">OS</text></svg>
+// @resource    journals_flat http://127.0.0.1:8787/data/journals_flat.json.gz
 // @match        *://*/*
-// --- 排除常见非学术网站（保留学术子域：xueshu.baidu.com、scholar.google.com 等）---
-// 搜索引擎 / 门户
 // @exclude      *://www.baidu.com/*
 // @exclude      *://m.baidu.com/*
 // @exclude      *://image.baidu.com/*
@@ -26,7 +25,6 @@
 // @exclude      *://www.quark.cn/*
 // @exclude      *://www.yahoo.com/*
 // @exclude      *://duckduckgo.com/*
-// 社交 / 社区
 // @exclude      *://*.weibo.com/*
 // @exclude      *://weibo.com/*
 // @exclude      *://mp.weixin.qq.com/*
@@ -41,7 +39,6 @@
 // @exclude      *://*.instagram.com/*
 // @exclude      *://*.youtube.com/*
 // @exclude      *://*.reddit.com/*
-// 购物
 // @exclude      *://*.taobao.com/*
 // @exclude      *://*.tmall.com/*
 // @exclude      *://*.jd.com/*
@@ -50,14 +47,12 @@
 // @exclude      *://*.amazon.com/*
 // @exclude      *://*.amazon.cn/*
 // @exclude      *://*.ebay.com/*
-// 视频 / 娱乐
 // @exclude      *://*.youku.com/*
 // @exclude      *://*.iqiyi.com/*
 // @exclude      *://*.v.qq.com/*
 // @exclude      *://*.tudou.com/*
 // @exclude      *://*.acfun.cn/*
 // @exclude      *://*.netflix.com/*
-// 新闻门户
 // @exclude      *://*.sina.com.cn/*
 // @exclude      *://*.sohu.com/*
 // @exclude      *://*.163.com/*
@@ -65,14 +60,12 @@
 // @exclude      *://*.people.com.cn/*
 // @exclude      *://*.xinhuanet.com/*
 // @exclude      *://*.thepaper.cn/*
-// 邮箱
 // @exclude      *://mail.qq.com/*
 // @exclude      *://mail.163.com/*
 // @exclude      *://mail.126.com/*
 // @exclude      *://*.outlook.com/*
 // @exclude      *://mail.google.com/*
 // @exclude      *://*.gmail.com/*
-// 办公 / 协作
 // @exclude      *://*.feishu.cn/*
 // @exclude      *://*.dingtalk.com/*
 // @exclude      *://*.wecom.qq.com/*
@@ -84,12 +77,10 @@
 // @exclude      *://*.wps.cn/*
 // @exclude      *://docs.google.com/*
 // @exclude      *://drive.google.com/*
-// 地图 / 生活
 // @exclude      *://*.amap.com/*
 // @exclude      *://*.gaode.com/*
 // @exclude      *://*.dianping.com/*
 // @exclude      *://*.meituan.com/*
-// 其他常见非学术
 // @exclude      *://*.csdn.net/*
 // @exclude      *://*.github.com/*
 // @exclude      *://*.stackoverflow.com/*
@@ -372,15 +363,11 @@
 // @connect      localhost
 // @connect      127.0.0.1
 // @grant        GM_xmlhttpRequest
-// @grant        GM.xmlHttpRequest
-// @grant        GM_setValue
-// @grant        GM.getValue
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_registerMenuCommand
-// @grant        GM.registerMenuCommand
 // @grant        GM_addStyle
-// @grant        GM.addStyle
+// @grant        GM_getResourceURL
 // @grant        unsafeWindow
 // @run-at       document-idle
 // @noframes
@@ -417,7 +404,7 @@
   // 1. Configuration
   // ===========================================================================
   const SCRIPT_NAME = 'JournalRank';
-  const SCRIPT_VERSION = '2.0.1';
+  const SCRIPT_VERSION = '2.2.0';
   const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const BATCH_SIZE = 50;                          // journals per /api/checkrank request
   const SCAN_DEBOUNCE_MS = 600;
@@ -466,6 +453,9 @@
     _ready: false,
     _loading: false,
     _lastUrl: '',
+    _resourceName: 'journals_flat',                  // matches @resource directive in metadata
+    _cacheKey:    'os_localdb_raw_v1',                // GM_set key for cached raw JSON text
+    _cacheTTL:    7 * 24 * 60 * 60 * 1000,           // 7 days
 
     /** Normalise a title for lookup key (same algorithm as export_flat_json.py). */
     _norm(s) {
@@ -473,17 +463,97 @@
       return String(s).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '');
     },
 
-    /** Fetch and parse the flat JSON (supports .json and .json.gz). */
-    async load(url) {
-      if (this._loading) return this._ready;
-      this._loading = true;
-      this._lastUrl = url;
+    /** Build in-memory title/ISSN indexes from a raw JSON string. */
+    _buildFromRaw(raw) {
+      const records = JSON.parse(raw);
+      const byTitle = new Map();
+      const byISSN = new Map();
+      for (const r of records) {
+        const nt = this._norm(r.ti);
+        if (nt && !byTitle.has(nt)) byTitle.set(nt, r);
+        if (r.zh) {
+          const nz = this._norm(r.zh);
+          if (nz && !byTitle.has(nz)) byTitle.set(nz, r);
+        }
+        if (r.in) {
+          const clean = r.in.replace(/[^0-9Xx]/g, '').toUpperCase();
+          if (clean && !byISSN.has(clean)) byISSN.set(clean, r);
+        }
+        if (r.es) {
+          const clean = r.es.replace(/[^0-9Xx]/g, '').toUpperCase();
+          if (clean && !byISSN.has(clean)) byISSN.set(clean, r);
+        }
+      }
+      this._byTitle = byTitle;
+      this._byISSN = byISSN;
+      this._ready = true;
+      console.log(`[JournalRank] Local JSON indexed: ${records.length} journals, ${byTitle.size} title keys, ${byISSN.size} ISSN keys`);
+      return true;
+    },
+
+    /** Read cached raw JSON text from GM storage. Returns string or null. */
+    _readCache() {
+      try {
+        const raw = GM_get(this._cacheKey, null);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || !obj.ts || !obj.data) return null;
+        if (Date.now() - obj.ts > this._cacheTTL) return null;
+        return obj.data;
+      } catch (e) { return null; }
+    },
+
+    /** Persist raw JSON text to GM storage with TTL. */
+    _writeCache(rawText) {
+      try {
+        GM_set(this._cacheKey, JSON.stringify({ ts: Date.now(), data: rawText }));
+      } catch (e) { /* GM storage quota — ignore */ }
+    },
+
+    /**
+     * Load raw JSON text from a Tampermonkey @resource (bundled at install time).
+     * Supports .gz (auto-decompress) and plain .json. Returns string or null
+     * when the @resource is not registered or fetch failed.
+     */
+    async _loadFromResource() {
+      if (!this._resourceName) return null;
+      const getURL = (typeof GM_getResourceURL !== 'undefined')
+        ? GM_getResourceURL
+        : (typeof GM !== 'undefined' && GM.getResourceURL) ? GM.getResourceURL : null;
+      if (!getURL) return null;
+      try {
+        // GM_getResourceURL may be sync (older TM) or async (Promise)
+        const url = await Promise.resolve(getURL(this._resourceName));
+        if (!url) return null;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const buf = await resp.arrayBuffer();
+        let rawText;
+        // Try gzip first; if it fails (not gzipped / no API), decode as plain text
+        try {
+          if (typeof DecompressionStream === 'undefined') throw new Error('no DecompressionStream');
+          const ds = new DecompressionStream('gzip');
+          const writer = ds.writable.getWriter();
+          writer.write(buf);
+          writer.close();
+          const out = await new Response(ds.readable).arrayBuffer();
+          rawText = new TextDecoder('utf-8').decode(out);
+        } catch (e) {
+          rawText = new TextDecoder('utf-8').decode(buf);
+        }
+        console.log(`[JournalRank] @resource ${this._resourceName} loaded (${(rawText.length / 1024).toFixed(0)} KB)`);
+        return rawText;
+      } catch (e) {
+        console.warn(`[JournalRank] @resource ${this._resourceName} unavailable:`, e.message);
+        return null;
+      }
+    },
+
+    /** Fetch raw JSON text from a remote URL (.gz or .json). Returns string or null. */
+    async _loadFromUrl(url) {
       try {
         let raw;
         if (url.endsWith('.gz')) {
-          // GM_xmlhttpRequest doesn't natively decompress gzip for arraybuffer
-          // in all browsers.  We fetch as blob and use DecompressionStream.
-          // Guard: Firefox/Safari 旧版本不支持 DecompressionStream → 给出明确提示
           if (typeof DecompressionStream === 'undefined') {
             throw new Error('当前浏览器不支持 DecompressionStream，请改用 .json 地址或现代 Chrome/Edge');
           }
@@ -501,8 +571,7 @@
           writer.write(resp.response);
           writer.close();
           const result = await new Response(ds.readable).arrayBuffer();
-          const decoder = new TextDecoder('utf-8');
-          raw = decoder.decode(result);
+          raw = new TextDecoder('utf-8').decode(result);
         } else {
           const resp = await new Promise((resolve, reject) => {
             GM_xmlhttp({
@@ -515,43 +584,67 @@
           if (resp.status !== 200) throw new Error(`HTTP ${resp.status}`);
           raw = resp.responseText;
         }
-
-        const records = JSON.parse(raw);
-        const byTitle = new Map();
-        const byISSN = new Map();
-
-        for (const r of records) {
-          // Index by normalized title
-          const nt = this._norm(r.ti);
-          if (nt && !byTitle.has(nt)) byTitle.set(nt, r);
-          // Index by zh title
-          if (r.zh) {
-            const nz = this._norm(r.zh);
-            if (nz && !byTitle.has(nz)) byTitle.set(nz, r);
-          }
-          // Index by ISSN
-          if (r.in) {
-            const clean = r.in.replace(/[^0-9Xx]/g, '').toUpperCase();
-            if (clean && !byISSN.has(clean)) byISSN.set(clean, r);
-          }
-          if (r.es) {
-            const clean = r.es.replace(/[^0-9Xx]/g, '').toUpperCase();
-            if (clean && !byISSN.has(clean)) byISSN.set(clean, r);
-          }
-        }
-
-        this._byTitle = byTitle;
-        this._byISSN = byISSN;
-        this._ready = true;
-        console.log(`[JournalRank] Local JSON loaded: ${records.length} journals, ${byTitle.size} title keys, ${byISSN.size} ISSN keys`);
-        return true;
+        return raw;
       } catch (e) {
-        console.warn('[JournalRank] Local JSON load failed:', e.message);
+        console.warn('[JournalRank] Remote URL load failed:', e.message);
+        return null;
+      }
+    },
+
+    /**
+     * Initialise the local DB.
+     * Load order: GM_setValue cache → @resource → remote URL.
+     * Successful raw text is cached for 7 days to skip network on subsequent loads.
+     * Pass { skipCache: true } to force re-fetch (used by reload()).
+     * Returns true when the DB is ready.
+     */
+    async init(url, opts = {}) {
+      const skipCache = !!opts.skipCache;
+      if (this._loading) return this._ready;
+      if (this._ready) return true;
+      this._loading = true;
+      this._lastUrl = url || '';
+      try {
+        let raw = null;
+        const sources = [];
+        // 1. GM_setValue cache — instant, no network
+        if (!skipCache) {
+          raw = this._readCache();
+          if (raw) sources.push('cache');
+        }
+        // 2. @resource — bundled at script install, no per-page network
+        if (!raw) {
+          raw = await this._loadFromResource();
+          if (raw) { this._writeCache(raw); sources.push('@resource'); }
+        }
+        // 3. Remote URL fallback
+        if (!raw && url) {
+          raw = await this._loadFromUrl(url);
+          if (raw) { this._writeCache(raw); sources.push('url'); }
+        }
+        if (!raw) {
+          console.warn('[JournalRank] Local JSON: all sources failed (cache/@resource/url)');
+          this._ready = false;
+          return false;
+        }
+        console.log(`[JournalRank] Local JSON source: ${sources.join('→')}`);
+        return this._buildFromRaw(raw);
+      } catch (e) {
+        console.warn('[JournalRank] Local JSON init failed:', e.message);
         this._ready = false;
         return false;
       } finally {
         this._loading = false;
       }
+    },
+
+    /** Force re-fetch (invalidates cache, bypasses cache read). Used by "reload" menu. */
+    async reload(url) {
+      this._ready = false;
+      this._byTitle = null;
+      this._byISSN = null;
+      try { GM_set(this._cacheKey, ''); } catch (e) { /* ignore */ }
+      return this.init(url, { skipCache: true });
     },
 
     /** Look up a journal by title and/or ISSN. Returns { title, title_zh, issn, eissn, metrics } or null. */
@@ -637,16 +730,8 @@
     },
   };
 
-  // Auto-load local JSON on startup if URL is configured
-  if (SETTINGS.localJsonUrl && SETTINGS.useLocal) {
-    localDB.load(SETTINGS.localJsonUrl).then(ok => {
-      if (!ok) {
-        SETTINGS.useLocal = false;
-        saveSettings();
-      }
-    });
-  }
-
+  // NOTE: local DB auto-load moved to bootstrap() with an isLikelyAcademicPage()
+  // guard, so non-academic pages no longer fetch the 7.7MB JSON.
   // ===========================================================================
   // 2. Color palette — semantic, modern
   //    Each entry: { bg, fg, border }
@@ -658,9 +743,31 @@
     q3:      { bg: '#3498db', fg: '#fff', label: 'Q3 / 3区' },   // blue
     q4:      { bg: '#27ae60', fg: '#fff', label: 'Q4 / 4区' },   // green
     numeric: { bg: '#2c3e50', fg: '#fff', label: '指标数值' },   // dark — IF, CiteScore, etc.
-    index:   { bg: '#8e44ad', fg: '#fff', label: '收录' },       // purple — EI, CSCD, CSSCI, etc.
+    index:   { bg: '#8e44ad', fg: '#fff', label: '收录' },       // purple — fallback for unknown index sources
     warn:    { bg: '#c0392b', fg: '#fff', label: '预警' },       // dark red — on hold / warning
     neutral: { bg: '#7f8c8d', fg: '#fff', label: '其他' },       // gray — default
+  };
+
+  // Per-index-source colors — each收录 source gets a distinct hue so users
+  // can tell CSCD / CSSCI / 北大核心 / EI / DOAJ / CCF ... apart at a glance.
+  // Grouped by domain: international (purple), Chinese science (teal),
+  // Chinese humanities (blue), excellence/CS (red-orange).
+  const INDEX_COLORS = {
+    ei:      { bg: '#6c3483', fg: '#fff' },  // EI — 国际工程
+    doaj:    { bg: '#9b59b6', fg: '#fff' },  // DOAJ — 国际开放获取
+    cscd:    { bg: '#117a65', fg: '#fff' },  // CSCD — 中文科学引文
+    kjhx:    { bg: '#16a085', fg: '#fff' },  // 科技核心
+    istic:   { bg: '#0e6655', fg: '#fff' },  // ISTIC — 中国科技核心
+    cssci:   { bg: '#2471a3', fg: '#fff' },  // CSSCI — 人文社科
+    pku:     { bg: '#34495e', fg: '#fff' },  // 北大核心
+    ccf:     { bg: '#c0392b', fg: '#fff' },  // CCF — 计算机
+    nsfc:    { bg: '#d35400', fg: '#fff' },  // NSFC — 自然科学基金
+    rccse:   { bg: '#7d3c98', fg: '#fff' },  // RCCSE — 武大中国学术
+    scd:     { bg: '#2874a6', fg: '#fff' },  // SCD — 科学引文数据库
+    cacj:    { bg: '#138d75', fg: '#fff' },  // CACJ — 武大核心
+    clsci:   { bg: '#2e86c1', fg: '#fff' },  // CLSCI — 中国人文科学
+    nij:     { bg: '#922b21', fg: '#fff' },  // NJU — 南京大学核心
+    zyqk:    { bg: '#b7950b', fg: '#fff' },  // 中文核心
   };
 
   // Map a (source, value) pair to a color bucket
@@ -678,7 +785,8 @@
     if (source === 'imf' || source === 'if5' || source === 'jci' ||
         source === 'citescore' || source === 'sjr' || source === 'gsh5' ||
         source === 'jscr' || source === 'jif_rank') return COLORS.numeric;
-    // Index收录 (EI, CSCD, CSSCI, 北大核心, 科技核心, etc.)
+    // Index收录 — per-source distinct color (Issue 4: 之前所有中文索引都是同一种紫色)
+    if (INDEX_COLORS[source]) return INDEX_COLORS[source];
     if (['ei', 'cscd', 'cssci', 'pku', 'kjhx', 'ccf', 'doaj',
          'rccse', 'scd', 'cacj', 'clsci', 'nij', 'nsfc', 'zyqk'].includes(source)) return COLORS.index;
     return COLORS.neutral;
@@ -1307,14 +1415,18 @@
       { css: '.journal_title' },
     ]},
 
-    // --- Web of Science — 搜索结果页 ---
+    // --- Web of Science — 搜索结果页 + 详情页 ---
     { host: /webofscience\.com$|webofscience\.clarivate\.cn$|clarivate\.com$/, selectors: [
       // 搜索结果页：期刊名链接（Angular Material button > span）
       { css: 'a.summary-source-title-link span' },
       { css: 'a.source-title-link span' },
-      // 详情页
-      { css: '.stats-document-abstract-publishedIn > a' },
-      { css: '.sourceTitle' },
+      // 详情页：期刊名锚点。JCR 侧边栏 + Journal information 区块的期刊名链接
+      // 都带 jcrSideNav-color 类且 href 含 rowText (SO 字段查询)。注意不能单用
+      // .full-record-detail-section-links[href*=rowText] —— 那会误命中大量学科
+      // 分类下钻链接 (GIS / Environmental Sciences / Climate Action 等)。
+      // 旧版 selector (.stats-document-abstract-publishedIn > a / .sourceTitle)
+      // 在新版 WoS DOM 中已不存在 (Issue 3)。
+      { css: 'a.jcrSideNav-color[href*="rowText"] span' },
     ]},
     { host: 'xueshu.lanfanshu.cn', selectors: [
       { css: '.gs_a', extractVenue: true },
@@ -1371,9 +1483,32 @@
   //    Returns a list of detections: { elem, title, issn, eissn, source }
   // ===========================================================================
 
+  /**
+   * Whether an element is visible to users (Issue 1).
+   * Filters out Angular/CDK accessibility-hidden elements (e.g. the
+   * visually-hidden <h1>WOS Top Header</h1> on Web of Science) so we don't
+   * attach badges next to them and have the badge pop up at the top-left.
+   */
+  function isVisible(elem) {
+    if (!elem || !elem.closest) return true;
+    // Common a11y-hidden class names + explicit aria-hidden.
+    // Note: we intentionally do NOT check computed style (display:none) here
+    // because that requires layout and is slow on large pages; the class-based
+    // check covers the cases that actually cause stray badges.
+    const hidden = elem.closest(
+      '.cdk-visually-hidden, .sr-only, .visually-hidden, .mat-visually-hidden, ' +
+      '[aria-hidden="true"]'
+    );
+    return !hidden;
+  }
+
   /** Extract journal info from a single element using a selector spec. */
   function extractFromElem(elem, spec) {
     if (!elem) return null;
+    // Issue 1: skip Angular/CDK accessibility-hidden elements (e.g. the
+    // visually-hidden <h1>WOS Top Header</h1> on WoS that caused a stray
+    // "Arts" badge pinned to the top-left corner).
+    if (!isVisible(elem)) return null;
     let val = '';
     if (spec.attr) {
       val = (elem.getAttribute(spec.attr) || '').trim();
@@ -1453,7 +1588,7 @@
       cleanISSN(meta['prism.issn'] || '') || '';
     if (metaTitle && !detections.some(d => normName(d.title) === normName(metaTitle))) {
       // Find a reasonable element to attach to, or use document.title container
-      let attach = document.querySelector('h1') || document.body;
+      let attach = document.querySelector('h1:not(.cdk-visually-hidden):not(.sr-only):not(.visually-hidden):not(.mat-visually-hidden):not([aria-hidden="true"])') || document.body;
       if (!seenElems.has(attach)) {
         seenElems.add(attach);
         detections.push({
@@ -1477,7 +1612,7 @@
     if (detections.length === 0) {
       const ld = parseJsonLd();
       if (ld && ld.title) {
-        const attach = document.querySelector('h1') || document.body;
+        const attach = document.querySelector('h1:not(.cdk-visually-hidden):not(.sr-only):not(.visually-hidden):not(.mat-visually-hidden):not([aria-hidden="true"])') || document.body;
         seenElems.add(attach);
         detections.push({
           elem: attach, title: ld.title, issn: ld.issn, eissn: ld.eissn,
@@ -1490,7 +1625,7 @@
     if (detections.length === 0) {
       const ptTitle = extractFromPageTitle();
       if (ptTitle && ptTitle.length >= 3) {
-        const attach = document.querySelector('h1') || document.body;
+        const attach = document.querySelector('h1:not(.cdk-visually-hidden):not(.sr-only):not(.visually-hidden):not(.mat-visually-hidden):not([aria-hidden="true"])') || document.body;
         seenElems.add(attach);
         detections.push({
           elem: attach, title: ptTitle, issn: '', eissn: '',
@@ -1759,11 +1894,34 @@
   /** Render badges for one resolved journal onto its detected element. */
   function renderBadges(det, resolved, metrics) {
     const elem = det.elem;
-    if (!elem || elem.dataset.osRanked === '1') return;
+    if (!elem) return;
+    const curTitle = String(det.title || '');
+
+    // Issue 2: virtual-scroll node recycling (e.g. Web of Science search list).
+    // Angular CDK may reuse the same DOM <span> with a different journal title
+    // when the user scrolls. The persisted data-os-ranked marker would make us
+    // skip the recycled node, so the new journal got no badge (and the old
+    // badge stayed attached showing wrong info). Track the rendered title and
+    // tear down the previous render when it changes.
+    if (elem.dataset.osRanked === '1') {
+      if (elem.dataset.osTitle === curTitle) return;  // identical — already done
+      // Title changed: clear previous markers and remove the old badge sibling.
+      delete elem.dataset.osRanked;
+      delete elem.dataset.osStatus;
+      // The badge container was inserted via insertAdjacentElement('afterend'),
+      // so it sits as the immediate next sibling of elem inside the parent.
+      const old = elem.nextElementSibling;
+      if (old && old.classList && old.classList.contains('os-rank-badges')) {
+        old.remove();
+      }
+      // fall through to re-render with the new title
+    }
+
     if (!metrics) {
       // Mark as processed (negative result) so we don't retry
       elem.dataset.osRanked = '1';
       elem.dataset.osStatus = 'no-data';
+      elem.dataset.osTitle = curTitle;
       return;
     }
 
@@ -1802,6 +1960,7 @@
     if (container.children.length === 0) {
       elem.dataset.osRanked = '1';
       elem.dataset.osStatus = 'no-data';
+      elem.dataset.osTitle = curTitle;
       return;
     }
 
@@ -1824,6 +1983,7 @@
     // Mark the title element itself so we don't re-process it
     elem.dataset.osRanked = '1';
     elem.dataset.osStatus = 'done';
+    elem.dataset.osTitle = curTitle;
   }
 
   // ===========================================================================
@@ -2008,6 +2168,14 @@
     if (document.readyState !== 'complete' && document.readyState !== 'interactive') return;
     // Skip obviously non-academic pages (secondary guard after @exclude)
     if (!isLikelyAcademicPage()) return;
+
+    // Lazy-load local DB on first academic scan — covers SPA navigations that
+    // bypassed the bootstrap guard (initial page was non-academic).
+    if (SETTINGS.useLocal && !localDB._ready && !localDB._loading && SETTINGS.localJsonUrl) {
+      localDB.init(SETTINGS.localJsonUrl);
+      // Don't await: let this scan fall back to server mode; the next scan
+      // (after init resolves) will use the local DB.
+    }
 
     scanInProgress = true;
     try {
@@ -2200,6 +2368,7 @@
       document.querySelectorAll('[data-os-ranked="1"]').forEach(el => {
         delete el.dataset.osRanked;
         delete el.dataset.osStatus;
+        delete el.dataset.osTitle;
       });
       if (SETTINGS.enabled) debouncedScan();
     });
@@ -2209,6 +2378,7 @@
       document.querySelectorAll('[data-os-ranked="1"]').forEach(el => {
         delete el.dataset.osRanked;
         delete el.dataset.osStatus;
+        delete el.dataset.osTitle;
       });
       debouncedScan();
     });
@@ -2223,6 +2393,7 @@
       document.querySelectorAll('[data-os-ranked="1"]').forEach(el => {
         delete el.dataset.osRanked;
         delete el.dataset.osStatus;
+        delete el.dataset.osTitle;
       });
       debouncedScan();
     });
@@ -2242,7 +2413,7 @@
       saveSettings();
       if (SETTINGS.localJsonUrl) {
         statusToast.show('[JournalRank] 正在加载本地JSON数据...');
-        localDB.load(SETTINGS.localJsonUrl).then(ok => {
+        localDB.reload(SETTINGS.localJsonUrl).then(ok => {
           if (ok) {
             SETTINGS.useLocal = true;
             saveSettings();
@@ -2252,6 +2423,7 @@
             document.querySelectorAll('[data-os-ranked="1"]').forEach(el => {
               delete el.dataset.osRanked;
               delete el.dataset.osStatus;
+        delete el.dataset.osTitle;
             });
             debouncedScan();
           } else {
@@ -2272,7 +2444,7 @@
       saveSettings();
       if (SETTINGS.useLocal && !localDB._ready) {
         statusToast.show('[JournalRank] 正在加载本地JSON...');
-        localDB.load(SETTINGS.localJsonUrl).then(ok => {
+        localDB.init(SETTINGS.localJsonUrl).then(ok => {
           if (ok) {
             saveSettings();
             statusToast.show('[JournalRank] ✅ 本地模式已启用（秒级查询）');
@@ -2280,6 +2452,7 @@
             document.querySelectorAll('[data-os-ranked="1"]').forEach(el => {
               delete el.dataset.osRanked;
               delete el.dataset.osStatus;
+        delete el.dataset.osTitle;
             });
             debouncedScan();
           } else {
@@ -2294,6 +2467,7 @@
         document.querySelectorAll('[data-os-ranked="1"]').forEach(el => {
           delete el.dataset.osRanked;
           delete el.dataset.osStatus;
+        delete el.dataset.osTitle;
         });
         debouncedScan();
       } else {
@@ -2332,6 +2506,20 @@
     }
 
     registerMenu();
+
+    // Eagerly start local DB load (if enabled & page looks academic) so it's
+    // ready by the time the initial scan runs. Non-academic pages skip the
+    // 7.7MB fetch entirely (suggestion 2: isLikelyAcademicPage guard).
+    // SPA navigations later caught by lazy-load in scan().
+    if (SETTINGS.enabled && SETTINGS.useLocal && isLikelyAcademicPage()) {
+      localDB.init(SETTINGS.localJsonUrl).then(ok => {
+        if (!ok && SETTINGS.useLocal) {
+          // Preserve existing behaviour: disable local mode on failure
+          SETTINGS.useLocal = false;
+          saveSettings();
+        }
+      });
+    }
 
     // Initial scan
     if (SETTINGS.enabled) {
