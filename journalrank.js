@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
 // @namespace    https://www.hezibuluo.com/JournalRank-local
-// @version      2.3.1
+// @version      2.3.2
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -404,7 +404,7 @@
   // 1. Configuration
   // ===========================================================================
   const SCRIPT_NAME = 'JournalRank';
-  const SCRIPT_VERSION = '2.3.1';
+  const SCRIPT_VERSION = '2.3.2';
   const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const BATCH_SIZE = 50;                          // journals per /api/checkrank request
   const SCAN_DEBOUNCE_MS = 600;
@@ -2169,6 +2169,9 @@
   // ===========================================================================
 
   let scanInProgress = false;
+  // 若扫描正在进行时又有新请求(如知网翻页替换了表格行、MutationObserver 触发)，
+  // 记录脏标记，待当前扫描结束后补跑一次，避免"新页已加载却不再显示"。
+  let scanDirty = false;
   let lastScanUrl = '';
   const statusToast = (() => {
     let el = null;
@@ -2191,10 +2194,15 @@
   /** Run a full scan: detect → resolve → render. */
   async function scan() {
     if (!SETTINGS.enabled) return;
-    if (scanInProgress) return;
     if (document.readyState !== 'complete' && document.readyState !== 'interactive') return;
     // Skip obviously non-academic pages (secondary guard after @exclude)
     if (!isLikelyAcademicPage()) return;
+    // 上一轮扫描仍在进行：标记脏，结束后补跑一次，避免翻页/动态加载被吞。
+    if (scanInProgress) {
+      scanDirty = true;
+      return;
+    }
+    scanInProgress = true;
 
     // Lazy-load local DB on first academic scan. 从 bootstrap 开始预载；这里
     // await join 同一加载 Promise，确保首次渲染即走本地秒查而非慢速服务器。
@@ -2202,7 +2210,6 @@
       await localDB.init(SETTINGS.localJsonUrl);
     }
 
-    scanInProgress = true;
     try {
       const detections = detectJournals();
       if (detections.length === 0) return;
@@ -2294,6 +2301,11 @@
       console.warn('[JournalRank] scan error:', e);
     } finally {
       scanInProgress = false;
+      // 扫描期间有被跳过的请求：补跑一次（防止翻页/动态加载期间被吞的扫描）。
+      if (scanDirty) {
+        scanDirty = false;
+        setTimeout(() => scan(), 100);
+      }
     }
   }
 
