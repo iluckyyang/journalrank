@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
-// @namespace    https://github.com/iluckyyang/journalrank
-// @version      2.3.1
+// @namespace    https://www.hezibuluo.com/JournalRank-local
+// @version      2.2.0
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -1107,27 +1107,6 @@
     };
   }
 
-  /** Throttle — fire at most once per `wait`, with a trailing call. */
-  function throttle(fn, wait) {
-    let lastTime = 0;
-    let timer = null;
-    return function (...args) {
-      const now = Date.now();
-      const remaining = wait - (now - lastTime);
-      if (remaining <= 0) {
-        if (timer) { clearTimeout(timer); timer = null; }
-        lastTime = now;
-        fn.apply(this, args);
-      } else if (!timer) {
-        timer = setTimeout(() => {
-          lastTime = Date.now();
-          timer = null;
-          fn.apply(this, args);
-        }, remaining);
-      }
-    };
-  }
-
   /** Promise-based GM_xmlhttpRequest. */
   function gmFetch(url, opts = {}) {
     return new Promise((resolve, reject) => {
@@ -1448,19 +1427,7 @@
       // 旧版 selector (.stats-document-abstract-publishedIn > a / .sourceTitle)
       // 在新版 WoS DOM 中已不存在 (Issue 3)。
       { css: 'a.jcrSideNav-color[href*="rowText"] span' },
-      // 新版 WoS (2024+) 搜索结果页期刊名可能渲染为 button，补兜底。
-      // 注意：刻意只用「… span」限定到叶子节点，不用「[class*="source-title"]」
-      // 或「app-summary-title a」这类元素级选择器——它们与上面的 span 选择器
-      // 命中同一个 <a>/<span> 会重复渲染出双份徽章（即"分级显示错乱"）。
-      { css: 'button.summary-source-title-link span' },
-      { css: '[class*="source-title"] span' },
-    ],
-      issnSelectors: [
-        { css: 'meta[name="citation_issn"]', attr: 'content' },
-      ],
-      // WoS 结果列表在内部 cdk-virtual-scroll 容器中滚动，需额外监听其滚动事件。
-      scrollContainer: '.cdk-virtual-scroll-viewport, [class*="search-results-container"], [class*="results-list"]',
-    },
+    ]},
     { host: 'xueshu.lanfanshu.cn', selectors: [
       { css: '.gs_a', extractVenue: true },
       { css: '.gs_ora_pubvenue' },
@@ -1587,14 +1554,6 @@
           if (seenElems.has(elem)) continue;
           const title = extractFromElem(elem, spec);
           if (!title) continue;
-          // 虚拟滚动会复用同一 DOM 节点：页面只更新 textContent 为新期刊名，
-          // 但 data-os-* 标记不会被清掉。因此仅当「已渲染且标题仍一致」才跳过；
-          // 若复用后标题变了，重新检测并在 renderBadges 中重建徽章。
-          if (elem.dataset.osRanked === '1' && elem.dataset.osStatus === 'done' &&
-              elem.dataset.osTitle === title) {
-            seenElems.add(elem);
-            continue;
-          }
           seenElems.add(elem);
           detections.push({ elem, title, issn: '', eissn: '', source: 'site:' + site.host });
           count++;
@@ -1936,8 +1895,6 @@
   function renderBadges(det, resolved, metrics) {
     const elem = det.elem;
     if (!elem) return;
-    // 虚拟滚动可能已把该节点移出文档，避免向已脱离 DOM 的节点插入徽章。
-    if (!document.contains(elem)) return;
     const curTitle = String(det.title || '');
 
     // Issue 2: virtual-scroll node recycling (e.g. Web of Science search list).
@@ -1956,11 +1913,6 @@
       const old = elem.nextElementSibling;
       if (old && old.classList && old.classList.contains('os-rank-badges')) {
         old.remove();
-      }
-      // 少数情况下徽章可能出现在前一兄弟位置，一并清理。
-      const prevOld = elem.previousElementSibling;
-      if (prevOld && prevOld.classList && prevOld.classList.contains('os-rank-badges')) {
-        prevOld.remove();
       }
       // fall through to re-render with the new title
     }
@@ -2022,8 +1974,6 @@
 
     // Insert next to the detected element.
     // Try insertAdjacentElement('afterend') first; fall back to appendChild.
-    // 插入前再次确认元素仍在文档中，虚拟滚动期间可能已被移除。
-    if (!document.contains(elem)) return;
     try {
       elem.insertAdjacentElement('afterend', container);
     } catch (e) {
@@ -2192,7 +2142,6 @@
   // ===========================================================================
 
   let scanInProgress = false;
-  let scanDirty = false;          // 虚拟滚动期间若扫描被锁跳过，置脏以便结束后补扫
   let lastScanUrl = '';
   const statusToast = (() => {
     let el = null;
@@ -2215,8 +2164,7 @@
   /** Run a full scan: detect → resolve → render. */
   async function scan() {
     if (!SETTINGS.enabled) return;
-    // 若已有扫描在进行，标记脏并返回；由进行中的扫描结束后补扫，避免丢失。
-    if (scanInProgress) { scanDirty = true; return; }
+    if (scanInProgress) return;
     if (document.readyState !== 'complete' && document.readyState !== 'interactive') return;
     // Skip obviously non-academic pages (secondary guard after @exclude)
     if (!isLikelyAcademicPage()) return;
@@ -2321,24 +2269,18 @@
       console.warn('[JournalRank] scan error:', e);
     } finally {
       scanInProgress = false;
-      // 扫描期间若收到了新的扫描请求，立即补扫一次，避免虚拟滚动新增条目被漏掉。
-      if (scanDirty) {
-        scanDirty = false;
-        setTimeout(() => scan(), 100);
-      }
     }
   }
 
   const debouncedScan = debounce(scan, SCAN_DEBOUNCE_MS);
 
-  /** Set up MutationObserver to re-scan on SPA navigations / dynamic content. */
+  /** Set up a MutationObserver to re-scan on SPA navigations / dynamic content. */
   function observeMutations() {
     let lastUrl = location.href;
     // URL-change watcher (for SPAs that don't trigger MutationObserver)
     setInterval(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
-        scanDirty = false;  // SPA 切换到新页面后重置脏标记，确保完整扫描
         debouncedScan();
       }
     }, 1000);
@@ -2353,8 +2295,8 @@
                 !n.classList?.contains('os-rank-badges') &&
                 !n.classList?.contains('os-tooltip') &&
                 !n.classList?.contains('os-status-toast')) {
-                hasAdded = true;
-                break;
+              hasAdded = true;
+              break;
             }
           }
         }
@@ -2366,57 +2308,6 @@
       childList: true,
       subtree: true,
     });
-
-    // --- 滚动监听（处理 WoS 等站点的虚拟滚动 / 懒加载） ---
-    // WoS 结果列表在内部 cdk-virtual-scroll 容器中滚动，窗口滚动不会触发，
-    // 需要监听 window + 内部滚动容器。scroll -> throttle -> debouncedScan。
-    const throttledScrollScan = throttle(() => debouncedScan(), 500);
-
-    window.addEventListener('scroll', throttledScrollScan, { passive: true });
-
-    // 绑定内部滚动容器（Angular CDK 渲染完成后容器才会存在，稍后延迟查找）
-    const site = matchSite();
-    const scrollSelectors = site && site.scrollContainer ? site.scrollContainer : '.cdk-virtual-scroll-viewport';
-    const bindScroll = () => {
-      const containers = document.querySelectorAll(scrollSelectors);
-      let bound = 0;
-      containers.forEach(c => {
-        if (c.dataset.osBoundScroll) return;
-        c.dataset.osBoundScroll = '1';
-        c.addEventListener('scroll', throttledScrollScan, { passive: true });
-        bound++;
-      });
-      return bound;
-    };
-    // 首次尝试
-    setTimeout(() => { bindScroll(); }, 1500);
-    // 若初始未找到容器，观察 body，容器出现时再绑定
-    const scrollObs = new MutationObserver(() => { bindScroll(); });
-    scrollObs.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => scrollObs.disconnect(), 30000);   // 30 秒后放弃
-
-    // --- 定时兜底扫描 ---
-    // 覆盖 MutationObserver / scroll 都未捕获的边缘情况：周期性地快速检查
-    // 页面上是否仍存在未处理的期刊名元素，有则重新扫描。
-    let periodicCount = 0;
-    const MAX_PERIODIC = 90;                 // 约 12 分钟
-    const periodicTimer = setInterval(() => {
-      if (!SETTINGS.enabled) return;
-      if (++periodicCount > MAX_PERIODIC) { clearInterval(periodicTimer); return; }
-      const s = matchSite();
-      if (!s) return;
-      for (const spec of s.selectors) {
-        let elems;
-        try { elems = document.querySelectorAll(spec.css); } catch (e) { continue; }
-        for (const el of elems) {
-          // 存在未处理且非空的期刊名元素 → 触发一次扫描
-          if (el.dataset.osRanked !== '1' && (el.textContent || '').trim().length >= 2) {
-            debouncedScan();
-            return;
-          }
-        }
-      }
-    }, 8000);
   }
 
   // ===========================================================================
