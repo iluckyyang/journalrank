@@ -7,14 +7,14 @@ Tampermonkey 用户脚本 —— 在中国知网（CNKI）搜索/详情页自动
 ## 功能
 
 - 在搜索结果页与文章详情页自动识别期刊名
+
 - 查询本地内嵌数据库并在期刊名旁添加彩色徽章，直观展示：
+  
   - JCR 分区 (Q1/Q2/Q3/Q4)
   - 中科院分区
   - 新锐分区
 
 - 各类中文收录：EI、CSCD、CSSCI、北大核心等
-
-
 
 ## 支持网站
 
@@ -27,7 +27,7 @@ Tampermonkey 用户脚本 —— 在中国知网（CNKI）搜索/详情页自动
 ## 安装
 
 1. 安装 Tampermonkey 浏览器扩展
-2. 打开 [journalrank.js](journalrank.js)，点击「Raw」，Tampermonkey 会提示安装
+2. 打开 [journalrank.js](https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/journalrank.user.js)，点击「Raw」，Tampermonkey 会提示安装
 3. 安装时脚本会从 jsDelivr CDN 自动拉取期刊数据（`journals_flat.json.gz`），无需本地后端
 
 ## 数据格式
