@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
 // @namespace    https://www.hezibuluo.com/JournalRank-local
-// @version      2.2.0
+// @version      2.3.0
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -1284,6 +1284,8 @@
       { css: '.gs_ora_pubvenue' },
       { css: '.gs_ct1' },
       { css: '.gs_scl > .gsc_oci_value' },
+      // 作者引用页 (/citations)：每行论文最下方的文献出处 div（形如 "Venue, Year"）
+      { css: 'td.gsc_a_t div.gs_gray:last-of-type', mapVenue: true },
     ]},
 
     // --- ResearchGate ---
@@ -1417,15 +1419,14 @@
 
     // --- Web of Science — 搜索结果页 + 详情页 ---
     { host: /webofscience\.com$|webofscience\.clarivate\.cn$|clarivate\.com$/, selectors: [
-      // 搜索结果页：期刊名链接（Angular Material button > span）
-      { css: 'a.summary-source-title-link span' },
-      { css: 'a.source-title-link span' },
-      // 详情页：期刊名锚点。JCR 侧边栏 + Journal information 区块的期刊名链接
-      // 都带 jcrSideNav-color 类且 href 含 rowText (SO 字段查询)。注意不能单用
-      // .full-record-detail-section-links[href*=rowText] —— 那会误命中大量学科
-      // 分类下钻链接 (GIS / Environmental Sciences / Climate Action 等)。
-      // 旧版 selector (.stats-document-abstract-publishedIn > a / .sourceTitle)
-      // 在新版 WoS DOM 中已不存在 (Issue 3)。
+      // 搜索结果页：期刊名链接。参照 CCFRank 用元素级选择器（取 textContent），
+      // 兼容按钮/链接两种 WoS 渲染；两个 class 命中同一个 <a>，由 seenElems 去重，
+      // 不产生重复徽章（避免此前"重复显示"回归）。
+      { css: '.summary-source-title-link' },
+      { css: '.source-title-link' },
+      // 详情页：JCR 侧边栏 + Journal information 区块的期刊名锚点。href 含
+      // rowText (SO 字段查询)。不能单用 .full-record-detail-section-links[href*=rowText]
+      // —— 那会误命中大量学科分类下钻链接 (GIS / Environmental Sciences 等)。
       { css: 'a.jcrSideNav-color[href*="rowText"] span' },
     ]},
     { host: 'xueshu.lanfanshu.cn', selectors: [
@@ -1518,6 +1519,11 @@
     // Special handling for Google Scholar .gs_a venue format
     if (spec.extractVenue) {
       val = extractVenueFromGsA(val);
+    } else if (spec.mapVenue) {
+      // Google Scholar /citations 引用页：出处 div 文本形如 "Venue, 2020"，
+      // 仅剥离末尾年份，保留期刊/会议名。
+      const m = val.match(/^\s*(.+?)\s*[，,]?\s*\d{4}\s*$/);
+      val = cleanTitle(m ? m[1] : val);
     } else {
       val = cleanTitle(val);
     }
@@ -2308,6 +2314,16 @@
       childList: true,
       subtree: true,
     });
+
+    // WoS 用 Angular CDK 虚拟滚动：新结果在滚动时才渲染，且常发生在 CDK
+    // 内部滚动容器内，MutationObserver 不可靠。参照 CCFRank 的做法，仅对
+    // Web of Science 单独加定时兜底重扫 + popstate 监听，从而不影响知网等
+    // 其他站点（避免重复显示回归）。已渲染条目由 renderBadges 的
+    // osTitle 比较防重，重复扫描仅补齐滚动后新增的行。
+    if (/webofscience\./.test(location.hostname)) {
+      setInterval(() => { debouncedScan(); }, 700);
+      window.addEventListener('popstate', () => { debouncedScan(); });
+    }
   }
 
   // ===========================================================================
