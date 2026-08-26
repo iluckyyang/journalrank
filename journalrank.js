@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
 // @namespace    https://www.hezibuluo.com/JournalRank-local
-// @version      2.3.2
+// @version      2.3.3
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -404,7 +404,7 @@
   // 1. Configuration
   // ===========================================================================
   const SCRIPT_NAME = 'JournalRank';
-  const SCRIPT_VERSION = '2.3.2';
+  const SCRIPT_VERSION = '2.3.3';
   const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const BATCH_SIZE = 50;                          // journals per /api/checkrank request
   const SCAN_DEBOUNCE_MS = 600;
@@ -1554,6 +1554,18 @@
   function detectJournals() {
     const detections = [];
     const seenElems = new WeakSet();
+    // 检查 elem 自身或其任意祖先是否已被本次扫描处理过。
+    // 用于跨层级去重：同一单元格内 <a> 与 <span> 会被不同选择器分别命中，
+    // 若仅按节点去重会重复渲染徽章；此处向上遍历祖先链，处理完 <a> 后其
+    // 子孙 <span> 即被跳过（等价 cnki-Scholar 每格只处理一次）。
+    const isSelfOrAncestorSeen = (el) => {
+      let p = el;
+      while (p) {
+        if (seenElems.has(p)) return true;
+        p = p.parentElement;
+      }
+      return false;
+    };
 
     // --- Pass 1: per-site selectors ---
     const site = matchSite();
@@ -1566,7 +1578,8 @@
         let count = 0;
         for (const elem of elems) {
           if (count >= MAX_BADGES_PER_PAGE) break;
-          if (seenElems.has(elem)) continue;
+          // 节点相等或祖先链已见 → 跳过（避免同格 a/span 重复渲染）
+          if (seenElems.has(elem) || isSelfOrAncestorSeen(elem)) continue;
           const title = extractFromElem(elem, spec);
           if (!title) continue;
           seenElems.add(elem);
@@ -2282,6 +2295,7 @@
             if (d.elem) {
               d.elem.dataset.osRanked = '1';
               d.elem.dataset.osStatus = r && r.error ? 'error' : 'no-data';
+              d.elem.dataset.osTitle = String(d.title || '');
             }
           }
           continue;
