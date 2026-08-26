@@ -6,7 +6,7 @@
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
 // @icon         data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="%233498db"/><text x="12" y="17" font-size="14" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">OS</text></svg>
-// @resource    journals_flat http://127.0.0.1:8787/data/journals_flat.json.gz
+// @resource    journals_flat https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/data/journals_flat.json.gz
 // @match        *://*/*
 // @exclude      *://www.baidu.com/*
 // @exclude      *://m.baidu.com/*
@@ -422,7 +422,7 @@
     displayOrder: ['imf', 'jcr', 'cas', 'xr', 'ei', 'cscd', 'cssci', 'xr_warning'],
     // Local JSON mode: set localJsonUrl to a flat JSON URL for instant lookups
     // Generate via: python scripts/export_flat_json.py --minify --gzip
-    localJsonUrl: 'http://127.0.0.1:8787/data/journals_flat.json.gz',      // e.g. 'http://127.0.0.1:8787/data/journals_flat.json.gz'
+    localJsonUrl: 'https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/data/journals_flat.json.gz',      // e.g. 'https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/data/journals_flat.json.gz'
     useLocal: true,        // 默认开启本地优先：加载成功则离线秒查，失败自动回退服务器模式
   };
 
@@ -2403,7 +2403,7 @@
       const v = prompt(
         '请输入扁平JSON地址（支持 .json 或 .json.gz）：\n' +
         '生成方式: python scripts/export_flat_json.py --minify --gzip\n' +
-        '示例: http://127.0.0.1:8787/data/journals_flat.json.gz\n' +
+        '示例: https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/data/journals_flat.json.gz\n' +
         '留空则使用服务器模式',
         cur
       );
