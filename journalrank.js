@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
-// @namespace    https://www.hezibuluo.com/JournalRank-local
-// @version      2.3.3
+// @namespace    https://github.com/iluckyyang/journalrank
+// @version      0.0.1
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -404,7 +404,7 @@
   // 1. Configuration
   // ===========================================================================
   const SCRIPT_NAME = 'JournalRank';
-  const SCRIPT_VERSION = '2.3.3';
+  const SCRIPT_VERSION = '0.0.1';
   const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const BATCH_SIZE = 50;                          // journals per /api/checkrank request
   const SCAN_DEBOUNCE_MS = 600;
