@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
 // @namespace    https://www.hezibuluo.com/JournalRank-local
-// @version      2.3.0
+// @version      2.3.1
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -404,7 +404,7 @@
   // 1. Configuration
   // ===========================================================================
   const SCRIPT_NAME = 'JournalRank';
-  const SCRIPT_VERSION = '2.2.0';
+  const SCRIPT_VERSION = '2.3.1';
   const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const BATCH_SIZE = 50;                          // journals per /api/checkrank request
   const SCAN_DEBOUNCE_MS = 600;
@@ -452,6 +452,7 @@
     _byISSN: null,        // ISSN -> record
     _ready: false,
     _loading: false,
+    _promise: null,       // 指向进行中的 init Promise，便于并发调用 join 等待
     _lastUrl: '',
     _resourceName: 'journals_flat',                  // matches @resource directive in metadata
     _cacheKey:    'os_localdb_raw_v1',                // GM_set key for cached raw JSON text
@@ -600,42 +601,50 @@
      */
     async init(url, opts = {}) {
       const skipCache = !!opts.skipCache;
-      if (this._loading) return this._ready;
       if (this._ready) return true;
+      // 已有加载在进行：加入同一加载 Promise（而非立即返回未就绪状态），
+      // 这样 scan/bootstrap 可在首次渲染时等待本地库就绪，避免走慢速服务器。
+      // 注意：不能过早 return —— 必须 join 到真正完成的 Promise。
+      if (this._loading && this._promise) return this._promise;
+      if (this._loading) return this._ready;
       this._loading = true;
       this._lastUrl = url || '';
-      try {
-        let raw = null;
-        const sources = [];
-        // 1. GM_setValue cache — instant, no network
-        if (!skipCache) {
-          raw = this._readCache();
-          if (raw) sources.push('cache');
-        }
-        // 2. @resource — bundled at script install, no per-page network
-        if (!raw) {
-          raw = await this._loadFromResource();
-          if (raw) { this._writeCache(raw); sources.push('@resource'); }
-        }
-        // 3. Remote URL fallback
-        if (!raw && url) {
-          raw = await this._loadFromUrl(url);
-          if (raw) { this._writeCache(raw); sources.push('url'); }
-        }
-        if (!raw) {
-          console.warn('[JournalRank] Local JSON: all sources failed (cache/@resource/url)');
+      this._promise = (async () => {
+        try {
+          let raw = null;
+          const sources = [];
+          // 1. GM_setValue cache — instant, no network
+          if (!skipCache) {
+            raw = this._readCache();
+            if (raw) sources.push('cache');
+          }
+          // 2. @resource — bundled at script install, no per-page network
+          if (!raw) {
+            raw = await this._loadFromResource();
+            if (raw) { this._writeCache(raw); sources.push('@resource'); }
+          }
+          // 3. Remote URL fallback
+          if (!raw && url) {
+            raw = await this._loadFromUrl(url);
+            if (raw) { this._writeCache(raw); sources.push('url'); }
+          }
+          if (!raw) {
+            console.warn('[JournalRank] Local JSON: all sources failed (cache/@resource/url)');
+            this._ready = false;
+            return false;
+          }
+          console.log(`[JournalRank] Local JSON source: ${sources.join('→')}`);
+          return this._buildFromRaw(raw);
+        } catch (e) {
+          console.warn('[JournalRank] Local JSON init failed:', e.message);
           this._ready = false;
           return false;
+        } finally {
+          this._loading = false;
+          this._promise = null;
         }
-        console.log(`[JournalRank] Local JSON source: ${sources.join('→')}`);
-        return this._buildFromRaw(raw);
-      } catch (e) {
-        console.warn('[JournalRank] Local JSON init failed:', e.message);
-        this._ready = false;
-        return false;
-      } finally {
-        this._loading = false;
-      }
+      })();
+      return this._promise;
     },
 
     /** Force re-fetch (invalidates cache, bypasses cache read). Used by "reload" menu. */
@@ -1797,38 +1806,50 @@
 
     if (toFetch.length === 0) return out;
 
-    // Pass 2: batch-fetch uncached entries
-    try {
-      for (let start = 0; start < fetchPayload.length; start += BATCH_SIZE) {
-        const chunk = fetchPayload.slice(start, start + BATCH_SIZE);
-        const chunkIndices = toFetch.slice(start, start + BATCH_SIZE);
-        const resp = await callCheckrank(chunk);
-        const respResults = resp.results || {};
-        const resolved = resp.resolved || [];
-
-        for (let j = 0; j < chunk.length; j++) {
-          const detIdx = chunkIndices[j];
-          const q = queries[detIdx];
-          const r = resolved[j];  // null if not found
-          const key = q.issn ? 'issn:' + q.issn : 'name:' + normName(q.title || '');
-          if (!r) {
-            // Cache negative result so we don't keep retrying
-            setCached(key, { resolved: null, metrics: null });
-            out[detIdx] = { resolved: null, metrics: null };
-            continue;
+    // Pass 2: batch-fetch uncached entries.
+    // 并发处理多个批次（本地库未命中、需回退服务器时明显提速），
+    // 单个批次失败不影响其他批次。
+    const MAX_CONCURRENT = 3;
+    const chunkTasks = [];
+    for (let start = 0; start < fetchPayload.length; start += BATCH_SIZE) {
+      chunkTasks.push({
+        chunk: fetchPayload.slice(start, start + BATCH_SIZE),
+        idxs: toFetch.slice(start, start + BATCH_SIZE),
+      });
+    }
+    let nextChunk = 0;
+    const worker = async () => {
+      while (nextChunk < chunkTasks.length) {
+        const { chunk, idxs } = chunkTasks[nextChunk++];
+        try {
+          const resp = await callCheckrank(chunk);
+          const respResults = resp.results || {};
+          const resolved = resp.resolved || [];
+          for (let j = 0; j < idxs.length; j++) {
+            const detIdx = idxs[j];
+            const q = queries[detIdx];
+            const r = resolved[j];  // null if not found
+            const key = q.issn ? 'issn:' + q.issn : 'name:' + normName(q.title || '');
+            if (!r) {
+              setCached(key, { resolved: null, metrics: null });
+              out[detIdx] = { resolved: null, metrics: null };
+              continue;
+            }
+            const metrics = respResults[r.key] || null;
+            out[detIdx] = { resolved: r, metrics };
+            setCached(key, { resolved: r, metrics });
           }
-          const metrics = respResults[r.key] || null;
-          out[detIdx] = { resolved: r, metrics };
-          setCached(key, { resolved: r, metrics });
+        } catch (e) {
+          console.warn('[JournalRank] /api/checkrank batch failed:', e.message);
+          for (const detIdx of idxs) {
+            if (out[detIdx] === null) out[detIdx] = { resolved: null, metrics: null, error: e.message };
+          }
         }
       }
-    } catch (e) {
-      console.warn('[JournalRank] /api/checkrank failed:', e.message);
-      // Mark remaining as failed
-      for (const idx of toFetch) {
-        if (out[idx] === null) out[idx] = { resolved: null, metrics: null, error: e.message };
-      }
-    }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(MAX_CONCURRENT, chunkTasks.length) }, worker)
+    );
 
     return out;
   }
@@ -2175,12 +2196,10 @@
     // Skip obviously non-academic pages (secondary guard after @exclude)
     if (!isLikelyAcademicPage()) return;
 
-    // Lazy-load local DB on first academic scan — covers SPA navigations that
-    // bypassed the bootstrap guard (initial page was non-academic).
-    if (SETTINGS.useLocal && !localDB._ready && !localDB._loading && SETTINGS.localJsonUrl) {
-      localDB.init(SETTINGS.localJsonUrl);
-      // Don't await: let this scan fall back to server mode; the next scan
-      // (after init resolves) will use the local DB.
+    // Lazy-load local DB on first academic scan. 从 bootstrap 开始预载；这里
+    // await join 同一加载 Promise，确保首次渲染即走本地秒查而非慢速服务器。
+    if (SETTINGS.useLocal && !localDB._ready && SETTINGS.localJsonUrl) {
+      await localDB.init(SETTINGS.localJsonUrl);
     }
 
     scanInProgress = true;
