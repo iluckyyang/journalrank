@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
-// @namespace    https://www.hezibuluo.com/JournalRank-local
-// @version      2.3.0
+// @namespace    https://github.com/iluckyyang/journalrank
+// @version      2.3.1
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -1448,7 +1448,10 @@
       // 旧版 selector (.stats-document-abstract-publishedIn > a / .sourceTitle)
       // 在新版 WoS DOM 中已不存在 (Issue 3)。
       { css: 'a.jcrSideNav-color[href*="rowText"] span' },
-      // 新版 WoS (2024+) 搜索结果页期刊名可能渲染为 button，补兜底
+      // 新版 WoS (2024+) 搜索结果页期刊名可能渲染为 button，补兜底。
+      // 注意：刻意只用「… span」限定到叶子节点，不用「[class*="source-title"]」
+      // 或「app-summary-title a」这类元素级选择器——它们与上面的 span 选择器
+      // 命中同一个 <a>/<span> 会重复渲染出双份徽章（即"分级显示错乱"）。
       { css: 'button.summary-source-title-link span' },
       { css: '[class*="source-title"] span' },
     ],
@@ -1582,14 +1585,16 @@
         for (const elem of elems) {
           if (count >= MAX_BADGES_PER_PAGE) break;
           if (seenElems.has(elem)) continue;
-          // 跳过已成功渲染且标题未变的元素（虚拟滚动复用时标题会变，以下仍会重新渲染）。
-          // 避免每次扫描都对已处理元素重复查询/渲染，减轻扫描压力。
-          if (elem.dataset.osRanked === '1' && elem.dataset.osStatus === 'done') {
+          const title = extractFromElem(elem, spec);
+          if (!title) continue;
+          // 虚拟滚动会复用同一 DOM 节点：页面只更新 textContent 为新期刊名，
+          // 但 data-os-* 标记不会被清掉。因此仅当「已渲染且标题仍一致」才跳过；
+          // 若复用后标题变了，重新检测并在 renderBadges 中重建徽章。
+          if (elem.dataset.osRanked === '1' && elem.dataset.osStatus === 'done' &&
+              elem.dataset.osTitle === title) {
             seenElems.add(elem);
             continue;
           }
-          const title = extractFromElem(elem, spec);
-          if (!title) continue;
           seenElems.add(elem);
           detections.push({ elem, title, issn: '', eissn: '', source: 'site:' + site.host });
           count++;
