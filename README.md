@@ -1,6 +1,6 @@
 # JournalRank
 
-Tampermonkey 用户脚本 —— 在中国知网（CNKI）搜索/详情页自动识别期刊并显示期刊分区、影响因子与收录信息。
+Tampermonkey 用户脚本 —— 在中国知网（CNKI）搜索自动识别期刊并显示期刊分区与收录信息。
 
 > 当前版本暂支持 CNKI 、WOS、 Google scholar。
 
@@ -21,13 +21,13 @@ Tampermonkey 用户脚本 —— 在中国知网（CNKI）搜索/详情页自动
 | 网站                                | 搜索结果页 | 文章详情页 | 备注  |
 | --------------------------------- |:-----:|:-----:| --- |
 | CNKI 中国知网 (cnki.net)              | ✅     | ✅     |     |
-| Google Scholar (scholar.google.*) | ✅     | ✅     |     |
+| Google Scholar (scholar.google.*) | ✅     |      |     |
 | Web of Science (webofscience.com) | ✅     | ✅     |     |
 
 ## 安装
 
 1. 安装 Tampermonkey 浏览器扩展
-2. 打开 [journalrank.js](https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/journalrank.user.js)，点击「Raw」，Tampermonkey 会提示安装
+2. 打开 [journalrank.js](https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/journalrank.user.js)，Tampermonkey 会提示安装
 3. 安装时脚本会从 jsDelivr CDN 自动拉取期刊数据（`journals_flat.json.gz`），无需本地后端
 
 ## 数据格式
@@ -57,9 +57,6 @@ Tampermonkey 用户脚本 —— 在中国知网（CNKI）搜索/详情页自动
   - 首次发布（GitHub 托管）
   - 数据源使用 jsDelivr CDN，去除本地后端依赖
   - 支持 CNKI 知网、Web of Science、Google Scholar
-  - 
-
-- 
 
 ## License
 
