@@ -20,9 +20,17 @@
 // @match        *://*.googleusercontent.com/*
 // @match        *://xueshu.lanfanshu.cn/*
 // @match        *://*.webofscience.com/*
+// @match        *://*.clarivate.cn/*
 // @match        *://*.webofscience.clarivate.cn/*
 // @match        *://*.clarivate.com/*
 // @match        *://*.fenqubiao.com/*
+// @match        *://*.sciencedirect.com/*
+// @match        *://*.springer.com/*
+// @match        *://*.nature.com/*
+// @match        *://xueshu.baidu.com/*
+// @match        *://pubmed.ncbi.nlm.nih.gov/*
+// @match        *://*.tandfonline.com/*
+
 // @connect      *
 // @connect      cnki.net
 // @connect      deepl.com
