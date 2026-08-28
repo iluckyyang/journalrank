@@ -1,94 +1,28 @@
 // ==UserScript==
 // @name         JournalRank
 // @namespace    https://github.com/iluckyyang/journalrank
-// @version      0.0.2
+// @version      0.0.3
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
 // @icon         data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="%233498db"/><text x="12" y="17" font-size="14" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">OS</text></svg>
 // @resource    journals_flat https://gcore.jsdelivr.net/gh/iluckyyang/journalrank@main/data/journals_flat.json.gz
-// @match        *://*/*
-// @exclude      *://www.baidu.com/*
-// @exclude      *://m.baidu.com/*
-// @exclude      *://image.baidu.com/*
-// @exclude      *://tieba.baidu.com/*
-// @exclude      *://zhidao.baidu.com/*
-// @exclude      *://news.baidu.com/*
-// @exclude      *://map.baidu.com/*
-// @exclude      *://www.google.com/*
-// @exclude      *://m.google.com/*
-// @exclude      *://www.bing.com/*
-// @exclude      *://cn.bing.com/*
-// @exclude      *://www.sogou.com/*
-// @exclude      *://www.so.com/*
-// @exclude      *://www.sm.cn/*
-// @exclude      *://www.quark.cn/*
-// @exclude      *://www.yahoo.com/*
-// @exclude      *://duckduckgo.com/*
-// @exclude      *://*.weibo.com/*
-// @exclude      *://weibo.com/*
-// @exclude      *://mp.weixin.qq.com/*
-// @exclude      *://*.zhihu.com/*
-// @exclude      *://*.douban.com/*
-// @exclude      *://*.bilibili.com/*
-// @exclude      *://*.douyin.com/*
-// @exclude      *://*.xiaohongshu.com/*
-// @exclude      *://*.facebook.com/*
-// @exclude      *://*.twitter.com/*
-// @exclude      *://*.x.com/*
-// @exclude      *://*.instagram.com/*
-// @exclude      *://*.youtube.com/*
-// @exclude      *://*.reddit.com/*
-// @exclude      *://*.taobao.com/*
-// @exclude      *://*.tmall.com/*
-// @exclude      *://*.jd.com/*
-// @exclude      *://*.pinduoduo.com/*
-// @exclude      *://*.1688.com/*
-// @exclude      *://*.amazon.com/*
-// @exclude      *://*.amazon.cn/*
-// @exclude      *://*.ebay.com/*
-// @exclude      *://*.youku.com/*
-// @exclude      *://*.iqiyi.com/*
-// @exclude      *://*.v.qq.com/*
-// @exclude      *://*.tudou.com/*
-// @exclude      *://*.acfun.cn/*
-// @exclude      *://*.netflix.com/*
-// @exclude      *://*.sina.com.cn/*
-// @exclude      *://*.sohu.com/*
-// @exclude      *://*.163.com/*
-// @exclude      *://*.ifeng.com/*
-// @exclude      *://*.people.com.cn/*
-// @exclude      *://*.xinhuanet.com/*
-// @exclude      *://*.thepaper.cn/*
-// @exclude      *://mail.qq.com/*
-// @exclude      *://mail.163.com/*
-// @exclude      *://mail.126.com/*
-// @exclude      *://*.outlook.com/*
-// @exclude      *://mail.google.com/*
-// @exclude      *://*.gmail.com/*
-// @exclude      *://*.feishu.cn/*
-// @exclude      *://*.dingtalk.com/*
-// @exclude      *://*.wecom.qq.com/*
-// @exclude      *://*.teams.live.com/*
-// @exclude      *://*.teams.microsoft.com/*
-// @exclude      *://*.zoom.us/*
-// @exclude      *://*.notion.so/*
-// @exclude      *://*.office.com/*
-// @exclude      *://*.wps.cn/*
-// @exclude      *://docs.google.com/*
-// @exclude      *://drive.google.com/*
-// @exclude      *://*.amap.com/*
-// @exclude      *://*.gaode.com/*
-// @exclude      *://*.dianping.com/*
-// @exclude      *://*.meituan.com/*
-// @exclude      *://*.csdn.net/*
-// @exclude      *://*.github.com/*
-// @exclude      *://*.stackoverflow.com/*
-// @exclude      *://*.juejin.cn/*
-// @exclude      *://*.51job.com/*
-// @exclude      *://*.zhipin.com/*
-// @exclude      *://localhost:8787/*
-// @exclude      *://127.0.0.1:8787/*
+// @match        *://cnki.net/*
+// @match        *://*.cnki.net/*
+// @match        *://*.wanfangdata.com.cn/*
+// @match        *://*.cqvip.com/*
+// @match        *://scholar.google.com/*
+// @match        *://scholar.google.com.hk/*
+// @match        *://scholar.google.com.tw/*
+// @match        *://scholar.google.co.uk/*
+// @match        *://scholar.google.com.au/*
+// @match        *://scholar.google.ca/*
+// @match        *://*.googleusercontent.com/*
+// @match        *://xueshu.lanfanshu.cn/*
+// @match        *://*.webofscience.com/*
+// @match        *://*.webofscience.clarivate.cn/*
+// @match        *://*.clarivate.com/*
+// @match        *://*.fenqubiao.com/*
 // @connect      *
 // @connect      cnki.net
 // @connect      deepl.com
@@ -404,7 +338,7 @@
   // 1. Configuration
   // ===========================================================================
   const SCRIPT_NAME = 'JournalRank';
-  const SCRIPT_VERSION = '0.0.2';
+  const SCRIPT_VERSION = '0.0.3';
   const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const BATCH_SIZE = 50;                          // journals per /api/checkrank request
   const SCAN_DEBOUNCE_MS = 600;
