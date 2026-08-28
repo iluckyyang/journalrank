@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JournalRank
 // @namespace    https://github.com/iluckyyang/journalrank
-// @version      0.0.1
+// @version      0.0.2
 // @author       Yang
 // @license      AGPL-3.0-or-later
 // @description  在学术网站上显示期刊分区/影响因子/收录情况。本地后端版本，支持 JCR 分区、中科院分区、新锐分区、EI、CSCD、CSSCI、科技核心等。访问文献网页时，自动检测期刊名称/ISSN，调用本地后端查询并显示彩色徽章。
@@ -404,7 +404,7 @@
   // 1. Configuration
   // ===========================================================================
   const SCRIPT_NAME = 'JournalRank';
-  const SCRIPT_VERSION = '0.0.1';
+  const SCRIPT_VERSION = '0.0.2';
   const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const BATCH_SIZE = 50;                          // journals per /api/checkrank request
   const SCAN_DEBOUNCE_MS = 600;
@@ -1578,6 +1578,10 @@
         let count = 0;
         for (const elem of elems) {
           if (count >= MAX_BADGES_PER_PAGE) break;
+          // 跳过脚本自身注入的 UI（徽章容器 os-rank-badges 及其中的 os-badge / os-tooltip）。
+          // 徽章以 afterend 插在 td.source 内，是 `td.source span` 又能命中的 span，
+          // 若不清除这里会把它当"期刊名"，导致滚动 re-scan 时徽章之上叠徽章 → 重复。
+          if (elem.closest && elem.closest('.os-rank-badges, .os-tooltip')) continue;
           // 节点相等或祖先链已见 → 跳过（避免同格 a/span 重复渲染）
           if (seenElems.has(elem) || isSelfOrAncestorSeen(elem)) continue;
           const title = extractFromElem(elem, spec);
